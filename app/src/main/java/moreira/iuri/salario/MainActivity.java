@@ -1,19 +1,33 @@
 package moreira.iuri.salario;
 
+import android.content.Context;
+import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.Serializable;
 
 public class MainActivity extends AppCompatActivity {
 
     EditText salarioBruto;
     EditText dependentes;
     EditText pensao;
-    Button btCalcularSalarioLiquido;
-    TextView resultado;
+    EditText planoMedico;
+    EditText outrosDescontos;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,26 +37,64 @@ public class MainActivity extends AppCompatActivity {
         salarioBruto = (EditText) findViewById(R.id.txtSalarioBruto);
         dependentes = (EditText) findViewById(R.id.txtNumeroDependentes);
         pensao = (EditText) findViewById(R.id.txtPensao);
-        resultado = (TextView) findViewById(R.id.txt_resultado);
+        planoMedico = (EditText) findViewById(R.id.txtPlanoMedico);
+        outrosDescontos = (EditText) findViewById(R.id.txtOutrosDescontos);
+
     }
 
     public void gerarResultado(View v){
+        if(TextUtils.isEmpty(salarioBruto.getText())){
 
+            Toast.makeText(getBaseContext(), "Preencha o campo com o seu salário bruto.", Toast.LENGTH_SHORT).show();
+
+        }else {
             double salario = Double.parseDouble(salarioBruto.getText().toString());
-            int numDependentes = Integer.parseInt(dependentes.getText().toString());
-            double pensaoAlimenticia = Double.parseDouble(pensao.getText().toString());
+            int numDependentes;
+            double pensaoAlimenticia;
+            double valorPlanoMedico;
+            double valorOutrosDescontos;
 
+            if(TextUtils.isEmpty(dependentes.getText())){
+                numDependentes = 0;
+            }else{
+                numDependentes = Integer.parseInt(dependentes.getText().toString());
+            }
 
-                double salarioLiquido = calcularSalarioLiquido(salario,numDependentes,pensaoAlimenticia);
-                resultado.setText(String.valueOf(salarioLiquido));
+            if(TextUtils.isEmpty(pensao.getText())){
+                pensaoAlimenticia = 0;
+            }else{
+                pensaoAlimenticia = Double.parseDouble(pensao.getText().toString());
+            }
 
+            if(TextUtils.isEmpty(planoMedico.getText())){
+                valorPlanoMedico = 0;
+            }else{
+                valorPlanoMedico = Double.parseDouble(planoMedico.getText().toString());
+            }
+
+            if(TextUtils.isEmpty(outrosDescontos.getText())){
+                valorOutrosDescontos = 0;
+            }else{
+                valorOutrosDescontos = Double.parseDouble(outrosDescontos.getText().toString());
+            }
+
+            double salarioLiquido = calcularSalarioLiquido(salario, numDependentes, pensaoAlimenticia, valorPlanoMedico, valorPlanoMedico);
+
+            salvarContato(salario, numDependentes, pensaoAlimenticia, valorPlanoMedico, valorOutrosDescontos);
+
+            Intent resultadoActivity = new Intent(this, ResultadoActivity.class);
+            resultadoActivity.putExtra("totalDescontos",calcularTotalDescontos(salario,salarioLiquido));
+            resultadoActivity.putExtra("percentualDescontos",calcularPercentualDescontos(salario,salarioLiquido));
+            resultadoActivity.putExtra("salarioLiquido", salarioLiquido);
+            startActivity(resultadoActivity);
+        }
     }
 
-    public double calcularSalarioLiquido(double salario, int numDependentes, double pensaoAlimenticia){
+    public double calcularSalarioLiquido(double salario, int numDependentes, double pensaoAlimenticia, double planoMedico, double outrosDescontos){
         double inss = calcularINSS(salario);
         double  irpf = calcularIRPF(salario);
 
-        return salario - inss - irpf - pensaoAlimenticia - (numDependentes*189.59);
+        return salario - inss - irpf - pensaoAlimenticia - planoMedico - outrosDescontos - (numDependentes*189.59);
     }
 
     public double calcularINSS(double salarioBruto){
@@ -94,5 +146,53 @@ public class MainActivity extends AppCompatActivity {
         return salarioBruto;
     }
 
+    public double calcularTotalDescontos(double salarioBruto, double salarioLiquido){
+        return salarioBruto - salarioLiquido;
+    }
 
+    public double calcularPercentualDescontos(double salarioBruto, double salarioLiquido){
+        return (salarioLiquido*100)/salarioBruto;
+    }
+
+    public void salvarContato(double salario, int numDependentes, double pensaoAlimenticia, double planoMedico, double outrosDescontos) {
+
+            String stringSalario = Double.toString(salario);
+            String stringDependentes= Integer.toString(numDependentes);
+            String stringPensao = Double.toString(pensaoAlimenticia);
+            String stringPlanoMedico = Double.toString(planoMedico);
+            String stringOutros = Double.toString(outrosDescontos);
+
+            try {
+              
+                FileOutputStream fileout = openFileOutput("resultados.txt", MODE_PRIVATE);
+                OutputStreamWriter outputWriter = new OutputStreamWriter(fileout);
+                BufferedWriter bwriter = new BufferedWriter(outputWriter);
+
+
+                bwriter.write(
+                        "Salario: "+stringSalario+","+"Dependentes: "+stringDependentes+","+"Pensão: "+stringPensao+","+"Plano médico: "+stringPlanoMedico+","+"Outros: "+stringOutros
+                );
+                bwriter.write("\n\r");
+                bwriter.close();
+                outputWriter.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+    }
+
+    public void deletarArquivo(View v){
+
+        try {
+            FileOutputStream fileout = openFileOutput("resultados.txt", MODE_PRIVATE);
+            OutputStreamWriter outputWriter = new OutputStreamWriter(fileout);
+
+            outputWriter.write("");
+            outputWriter.close();
+
+            Toast.makeText(getBaseContext(), "Resultados apagados do arquivo.", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
